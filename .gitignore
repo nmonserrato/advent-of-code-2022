@@ -1,0 +1,7 @@
+target/
+.idea/
+.bsp/
+.history
+.cache
+.lib/
+project/
