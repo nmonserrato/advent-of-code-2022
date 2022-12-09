@@ -7,9 +7,9 @@ import scala.io.Source
 import scala.util.Using
 
 object Day09 {
-  private var h = XY.INITIAL
-  private var t = XY.INITIAL
   private val visited = mutable.HashSet[XY]()
+  private val knots = new Array[XY](10) // <- change this to 2 for part1
+  knots.indices.foreach(i => knots(i) = XY.INITIAL)
 
   def main(args: Array[String]): Unit = {
     Using(Source.fromResource("inputs/day09.txt")) { source => source.getLines().foreach { line =>
@@ -21,16 +21,19 @@ object Day09 {
   }
 
   private def makeMove(step: XY): Unit = {
-    h = h + step
-    if (t doesntNeedToMoveToward h) return
-    h diff t match {
-      case (x, y) =>
-        if (x > 0) t = t + STEP_RIGHT
-        if (x < 0) t = t + STEP_LEFT
-        if (y > 0) t = t + STEP_DOWN
-        if (y < 0) t = t + STEP_UP
+    knots(0) = knots(0) + step
+    (1 until knots.size).foreach { i =>
+      if (knots(i) needsToMoveToward knots(i - 1)) {
+        knots(i - 1) diff knots(i) match {
+          case (x, y) =>
+            if (x > 0) knots(i) = knots(i) + STEP_RIGHT
+            if (x < 0) knots(i) = knots(i) + STEP_LEFT
+            if (y > 0) knots(i) = knots(i) + STEP_DOWN
+            if (y < 0) knots(i) = knots(i) + STEP_UP
+        }
+      }
     }
-    visited.add(t)
+    visited.add(knots.last)
   }
 
   private def parseSteps(line: String): (XY, Int) = {
@@ -50,7 +53,7 @@ private final case class XY(x: Int, y: Int) {
 
   def diff(other: XY): (Int, Int) = (this.x - other.x, this.y - other.y)
 
-  def doesntNeedToMoveToward(other: XY): Boolean = (this.x - other.x).abs <= 1 && (this.y - other.y).abs <= 1
+  def needsToMoveToward(other: XY): Boolean = (this.x - other.x).abs > 1 || (this.y - other.y).abs > 1
 }
 
 private object XY {
