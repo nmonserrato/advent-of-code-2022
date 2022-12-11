@@ -9,21 +9,26 @@ object Day11 {
   def main(args: Array[String]): Unit = {
     Using(Source.fromResource("inputs/day11.txt")) { source =>
       val monkeys = Monkeys.parse(source.getLines())
-      playAllRounds(monkeys, 20, 3)
+      playAllRounds(monkeys, 20, divideByThree)
+      println("----------------------------------")
+      playAllRounds(monkeys, 10000, divideByOne)
     }
   }
 
-  private def playAllRounds(monkeys: Seq[Monkey], rounds: Int, divider: Int): Unit = {
-    (0 until rounds).foreach(_ => playRound(monkeys, divider))
+  private def divideByThree(num: Long): Long = num / 3
+  private def divideByOne(num: Long): Long = num / 1
+
+  private def playAllRounds(monkeys: Seq[Monkey], rounds: Int, manageAnxiety: Long => Long): Unit = {
+    (0 until rounds).foreach(_ => playRound(monkeys, manageAnxiety))
     printMonkeyItems(monkeys)
   }
 
-  private def playRound(monkeys: Seq[Monkey], divider: Int): Unit = {
+  private def playRound(monkeys: Seq[Monkey], manageAnxiety: Long => Long): Unit = {
     monkeys.foreach { currentMonkey =>
       while (currentMonkey.items.nonEmpty) {
         val item = currentMonkey.items.remove(0)
         currentMonkey.inspectedItems += 1
-        val worryLevel: Int = currentMonkey.operation(item) / divider
+        val worryLevel: Long = manageAnxiety(currentMonkey.operation(item))
         val testResult: Boolean = currentMonkey.test(worryLevel)
         monkeys(currentMonkey.destinations(testResult)).items.addOne(worryLevel)
       }
@@ -36,7 +41,7 @@ object Day11 {
     monkeys.zipWithIndex.foreach { case (m, idx) => println(s"Monkey $idx inspected items ${m.inspectedItems} times") }
     println()
     val businessLevel = monkeys.map(_.inspectedItems)
-      .sorted(Ordering[Int].reverse)
+      .sorted(Ordering[Long].reverse)
       .take(2)
       .product
     println(s"Monkey business level $businessLevel")
@@ -44,12 +49,12 @@ object Day11 {
 }
 
 private final class Monkey(
-  var items: mutable.ListBuffer[Int],
-  var operation: Int => Int,
-  var test: Int => Boolean,
+  var items: mutable.ListBuffer[Long],
+  var operation: Long => Long,
+  var test: Long => Boolean,
   var destinations: Map[Boolean, Int],
 ) {
-  var inspectedItems = 0
+  var inspectedItems: Long = 0
 }
 
 private object Monkeys {
@@ -74,29 +79,26 @@ private object Monkeys {
   implicit class MonkeyLines(line: String) {
     private val operationRegexp = """(old|\d+)\s(\*|\+)\s(old|\d+)""".r
 
-    def items: ListBuffer[Int] =
-      ListBuffer(line.substring(line.indexOf(": ") + 2).split(",").map(_.trim.toInt): _*)
+    def items: ListBuffer[Long] =
+      ListBuffer(line.substring(line.indexOf(": ") + 2).split(",").map(_.trim.toLong): _*)
 
-    def operation: Int => Int = {
+    def operation: Long => Long = {
       val operationStr = line.substring(line.indexOf("=") + 2).trim
       operationStr match {
         case operationRegexp(left, op, right) =>
           v =>
-            val op1 = if (left == "old") v else left.toInt
-            val op2 = if (right == "old") v else right.toInt
+            val op1 = if (left == "old") v else left.toLong
+            val op2 = if (right == "old") v else right.toLong
             if (op == "*") op1 * op2 else op1 + op2
         case _ => throw new IllegalArgumentException(s"Invalid pattern $operationStr")
       }
     }
 
-    def test: Int => Boolean = {
-      val num: Int = line.substring(line.indexOf("by ") + 3).toInt
-      input: Int => (input % num) == 0
+    def test: Long => Boolean = {
+      val num: Long = line.substring(line.indexOf("by ") + 3).toLong
+      input: Long => (input % num) == 0
     }
 
     def destination: Int = line.substring(line.indexOf("monkey") + 7).toInt
-
-    private def plus(op1: Int)(op2: Int): Int = op1 + op2
-    private def multiply(op1: Int)(op2: Int): Int = op1 * op2
   }
 }
