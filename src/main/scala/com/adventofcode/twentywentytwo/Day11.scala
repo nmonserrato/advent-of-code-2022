@@ -7,29 +7,33 @@ import scala.util.Using
 
 object Day11 {
   def main(args: Array[String]): Unit = {
-    Using(Source.fromResource("inputs/day11.txt")) { source =>
-      val monkeys = Monkeys.parse(source.getLines())
-      playAllRounds(monkeys, 20, divideByThree)
-      println("----------------------------------")
-      playAllRounds(monkeys, 10000, divideByOne)
-    }
+    parseAndPlay(20, divideByThree)
+    println("----------------------------------")
+    parseAndPlay(10000)
   }
 
   private def divideByThree(num: Long): Long = num / 3
-  private def divideByOne(num: Long): Long = num / 1
+
+  private def parseAndPlay(rounds: Int, manageAnxiety: Long => Long = in => in): Unit = {
+    Using(Source.fromResource("inputs/day11.txt")) { source =>
+      val monkeys = Monkeys.parse(source.getLines())
+      playAllRounds(monkeys, rounds, manageAnxiety)
+    }
+  }
 
   private def playAllRounds(monkeys: Seq[Monkey], rounds: Int, manageAnxiety: Long => Long): Unit = {
-    (0 until rounds).foreach(_ => playRound(monkeys, manageAnxiety))
+    val totalFactors = monkeys.map(_.divisibilityFactor).product
+    (0 until rounds).foreach(_ => playRound(monkeys, manageAnxiety, totalFactors))
     printMonkeyItems(monkeys)
   }
 
-  private def playRound(monkeys: Seq[Monkey], manageAnxiety: Long => Long): Unit = {
+  private def playRound(monkeys: Seq[Monkey], manageAnxiety: Long => Long, totalFactors: Long): Unit = {
     monkeys.foreach { currentMonkey =>
       while (currentMonkey.items.nonEmpty) {
         val item = currentMonkey.items.remove(0)
         currentMonkey.inspectedItems += 1
-        val worryLevel: Long = manageAnxiety(currentMonkey.operation(item))
-        val testResult: Boolean = currentMonkey.test(worryLevel)
+        val worryLevel: Long = manageAnxiety(currentMonkey.operation(item)) % totalFactors
+        val testResult: Boolean = worryLevel % currentMonkey.divisibilityFactor == 0
         monkeys(currentMonkey.destinations(testResult)).items.addOne(worryLevel)
       }
     }
@@ -44,14 +48,14 @@ object Day11 {
       .sorted(Ordering[Long].reverse)
       .take(2)
       .product
-    println(s"Monkey business level $businessLevel")
+    println(s"Monkey business level: $businessLevel")
   }
 }
 
 private final class Monkey(
   var items: mutable.ListBuffer[Long],
   var operation: Long => Long,
-  var test: Long => Boolean,
+  var divisibilityFactor: Long,
   var destinations: Map[Boolean, Int],
 ) {
   var inspectedItems: Long = 0
@@ -65,7 +69,7 @@ private object Monkeys {
       buf.addOne(new Monkey(
         items = input.next().items,
         operation = input.next().operation,
-        test = input.next().test,
+        divisibilityFactor = input.next().divisibilityFactor,
         destinations = Seq(
           true -> input.next().destination,
           false -> input.next().destination,
@@ -77,7 +81,7 @@ private object Monkeys {
   }
 
   implicit class MonkeyLines(line: String) {
-    private val operationRegexp = """(old|\d+)\s(\*|\+)\s(old|\d+)""".r
+    private val operationRegexp = """(old|\d+)\s([*+])\s(old|\d+)""".r
 
     def items: ListBuffer[Long] =
       ListBuffer(line.substring(line.indexOf(": ") + 2).split(",").map(_.trim.toLong): _*)
@@ -90,14 +94,10 @@ private object Monkeys {
             val op1 = if (left == "old") v else left.toLong
             val op2 = if (right == "old") v else right.toLong
             if (op == "*") op1 * op2 else op1 + op2
-        case _ => throw new IllegalArgumentException(s"Invalid pattern $operationStr")
       }
     }
 
-    def test: Long => Boolean = {
-      val num: Long = line.substring(line.indexOf("by ") + 3).toLong
-      input: Long => (input % num) == 0
-    }
+    def divisibilityFactor: Long = line.substring(line.indexOf("by ") + 3).toLong
 
     def destination: Int = line.substring(line.indexOf("monkey") + 7).toInt
   }
