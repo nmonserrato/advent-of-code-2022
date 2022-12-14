@@ -8,6 +8,18 @@ import scala.util.Using
 object Day12 {
   def main(args: Array[String]): Unit = {
     val (grid, start, end) = parseGrid()
+    println(findDistance(grid, start, end))
+
+    val bestFromAs = grid.indices.flatMap(row =>
+      grid(row).indices.filter(grid(row)(_) == 'a').map(col =>
+        findDistance(grid, (row, col), end)
+      )
+    ).filter(_ > 0).min
+
+    println(bestFromAs)
+  }
+
+  private def findDistance(grid: Array[Array[Char]], start: (Int, Int), end: (Int, Int)): Int = {
     val distances = new Array[Array[Int]](grid.size)
     grid.indices.foreach(row => distances(row) = new Array[Int](grid.head.size))
     grid.indices.foreach(r => distances(r).indices.foreach(c => distances(r)(c) = -1))
@@ -31,9 +43,7 @@ object Day12 {
       }
     }
 
-    println(distances(start._1)(start._2))
-    println(distances(end._1)(end._2))
-    distances.indices.foreach(r => println(distances(r).mkString(",")))
+    distances(end._1)(end._2)
   }
 
   private def canStep(grid: Array[Array[Char]], from: (Int, Int), to: (Int, Int)): Boolean = {
