@@ -7,66 +7,83 @@ import scala.util.Using
 
 object Day12 {
   def main(args: Array[String]): Unit = {
-    val (grid, start, end) = parseGrid()
-    println(findDistance(grid, start, end))
+    val grid = Grid.parseFromFile
+    println(grid.distanceFromStart)
+    println(grid.minDistanceFromAll('a'))
+  }
+}
 
-    val bestFromAs = grid.indices.flatMap(row =>
-      grid(row).indices.filter(grid(row)(_) == 'a').map(col =>
-        findDistance(grid, (row, col), end)
-      )
-    ).filter(_ > 0).min
+private class Grid(data: Array[Array[Char]], start: Point, end: Point) {
+  private[this] val rows = data.length
+  private[this] val cols = data.head.length
 
-    println(bestFromAs)
+  def distanceFromStart: Int = distanceFromPoint(start)
+
+  def minDistanceFromAll(startChar: Char): Int = {
+    (0 until rows).flatMap { row =>
+      (0 until cols).filter(data(row)(_) == startChar).map { col =>
+        distanceFromPoint(Point(row, col))
+      }
+    }.filter(_ > 0).min
   }
 
-  private def findDistance(grid: Array[Array[Char]], start: (Int, Int), end: (Int, Int)): Int = {
-    val distances = new Array[Array[Int]](grid.size)
-    grid.indices.foreach(row => distances(row) = new Array[Int](grid.head.size))
-    grid.indices.foreach(r => distances(r).indices.foreach(c => distances(r)(c) = -1))
-    val queue = new mutable.Queue[(Int, Int)]()
-    val updatedLastIteration = new mutable.Queue[(Int, Int)]()
-    distances(start._1)(start._2) = 0
-    updatedLastIteration.addOne(start)
+  private def distanceFromPoint(startPoint: Point): Int = {
+    val distances = new mutable.HashMap[Point, Int]()
+    val queue = new mutable.Queue[Point]()
+    val updatedLastIteration = new mutable.Queue[Point]()
+    distances(startPoint) = 0
+    updatedLastIteration.addOne(startPoint)
     while (updatedLastIteration.nonEmpty) {
       queue.addAll(updatedLastIteration)
       updatedLastIteration.clear()
       while (queue.nonEmpty) {
         val loc = queue.remove(0)
-        val locDist = distances(loc._1)(loc._2)
-        Seq((-1, 0), (0, -1), (1, 0), (0, 1)).foreach { mov =>
-          val neighbor = (loc._1 + mov._1, loc._2 + mov._2)
-          if (canStep(grid, loc, neighbor) && (distances(neighbor._1)(neighbor._2) == -1)) {
-            distances(neighbor._1)(neighbor._2) = locDist + 1
+        val locDist = distances(loc)
+        loc.neighbors.foreach { neighbor =>
+          if (canStep(loc, neighbor) && !distances.contains(neighbor)) {
+            distances(neighbor) = locDist + 1
             updatedLastIteration.addOne(neighbor)
           }
         }
       }
     }
 
-    distances(end._1)(end._2)
+    distances.getOrElse(end, -1)
   }
 
-  private def canStep(grid: Array[Array[Char]], from: (Int, Int), to: (Int, Int)): Boolean = {
-    if (to._1 < 0 || to._2 < 0 || to._1 >= grid.length || to._2 >= grid.head.length) return false
-    val fromChar = grid(from._1)(from._2)
-    val toChar = grid(to._1)(to._2)
-    if (fromChar == 'S') return toChar == 'a'
-    if (fromChar >= 'a' && fromChar < 'z') return toChar <= fromChar + 1
-    if (fromChar == 'z') return (toChar >='a' && toChar <= 'z') || toChar == 'E'
-    false
+  private[this] def canStep(from: Point, to: Point): Boolean = {
+    if (to.isOutOfBounds(rows, cols)) return false
+    (charAt(from), charAt(to)) match {
+      case ('S', toChar) => toChar == 'a'
+      case ('z', toChar) => (toChar >= 'a' && toChar <= 'z') || toChar == 'E'
+      case (fromChar, toChar) if fromChar >= 'a' && fromChar < 'z' => toChar <= fromChar + 1
+      case _ => false
+    }
   }
 
-  private def parseGrid(): (Array[Array[Char]], (Int, Int), (Int, Int)) = {
+  private[this] def charAt(point: Point): Char = data(point.row)(point.column)
+}
+
+private case class Point(row: Int, column: Int) {
+  def neighbors: Seq[Point] =
+    Seq(Point(row - 1, column), Point(row, column -1), Point(row + 1, column), Point(row, column + 1))
+
+  def isOutOfBounds(rows: Int, cols: Int): Boolean =
+    row < 0 || column < 0 || row >= rows || column >= cols
+}
+
+private object Grid {
+  def parseFromFile: Grid = {
     Using(Source.fromResource("inputs/day12.txt")) { source =>
       val buf = ListBuffer[Array[Char]]()
-      var start = (-1, -1)
-      var end = (-1, -1)
+      var start: Point = null
+      var end: Point = null
       source.getLines().zipWithIndex.foreach { case (line, idx) =>
         buf.addOne(line.toCharArray)
-        if (line.contains('S')) start = (idx, line.indexOf('S'))
-        if (line.contains('E')) end = (idx, line.indexOf('E'))
+        if (line.contains('S')) start = new Point(idx, line.indexOf('S'))
+        if (line.contains('E')) end = new Point(idx, line.indexOf('E'))
       }
-      (buf.toArray, start, end)
+      new Grid(buf.toArray, start, end)
     }.get
   }
 }
