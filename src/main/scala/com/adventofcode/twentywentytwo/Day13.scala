@@ -6,16 +6,29 @@ import scala.util.Using
 
 object Day13 {
   def main(args: Array[String]): Unit = {
-    val sumOfIndices = Using(Source.fromResource("inputs/day13.txt")) { source =>
+    println(orderedPairOfIndices)
+    println(decoderKey)
+  }
+
+  private def orderedPairOfIndices: Int = {
+    Using(Source.fromResource("inputs/day13.txt")) { source =>
       source.getLines().grouped(3).zipWithIndex.map { case (pair, index) =>
-          Element.compare(parseList(pair.head), parseList(pair(1))) match {
-            case x if x < 0 => index + 1
-            case _ => 0
-          }
+        Element.compare(parseList(pair.head), parseList(pair(1))) match {
+          case x if x < 0 => index + 1
+          case _ => 0
+        }
       }.filter(_ > 0).sum
     }.get
+  }
 
-    println(sumOfIndices)
+  private def decoderKey: Int = {
+    val strings = Using(Source.fromResource("inputs/day13.txt"))(_.getLines.toSeq).get
+    val dividers = Seq(parseList("[[2]]"), parseList("[[6]]"))
+    val elements = strings.filter(!_.isBlank).map(parseList).toSeq ++ dividers
+    elements.sorted.zipWithIndex
+      .filter(el => dividers.contains(el._1))
+      .map(_._2 + 1)
+      .product
   }
 
   def parseNumber(str: String): NumberElement = NumberElement(str.trim.toInt)
@@ -70,16 +83,22 @@ object Day13 {
   }
 }
 
-sealed trait Element
+sealed trait Element extends Ordered[Element] {
+  override def compare(that: Element): Int = Element.compare(this, that)
+}
 
-final case class NumberElement(value: Int) extends Element
+final case class NumberElement(value: Int) extends Element {
+  override def toString: String = value.toString
+}
 
 final case class ListElement(values: Seq[Element]) extends Element {
   def size: Int = values.size
   def apply(i: Int): Element = values(i)
+
+  override def toString: String = s"[${values.map(_.toString).mkString(",")}]"
 }
 object ListElement {
-  def of(numberElement: NumberElement) = ListElement(Seq(numberElement))
+  def of(element: Element) = ListElement(Seq(element))
 }
 
 object Element {
