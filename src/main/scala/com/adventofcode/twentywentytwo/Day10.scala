@@ -60,7 +60,7 @@ private final class CRT(registry: Registry) {
 
   def drawPixel(): Unit = {
     if (registry.cycle >= 240) return
-    display(registry.cycle) = if (pixelPositions.contains(registry.cycle % 40)) '#' else '.'
+    display(registry.cycle) = if (pixelPositions.contains(registry.cycle % 40)) '▉' else ' '
   }
 
   def screen: String = {
