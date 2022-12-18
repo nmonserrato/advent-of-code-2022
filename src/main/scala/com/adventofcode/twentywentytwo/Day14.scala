@@ -8,7 +8,8 @@ object Day14 {
   def main(args: Array[String]): Unit = {
     val rocks = parseRocks
     val grid = new RockGrid(rocks)
-    println(grid.maxGrainsDroppingFrom(500))
+    println(grid.maxGrainsTillOverflow(500))
+    println(grid.maxGrainsTillFull(500))
     println(grid)
   }
 
@@ -40,64 +41,61 @@ private object RockPoint {
 
 private class RockGrid(rocks: Seq[RockPath]) {
   private[this] val bounds = findBounds
-  private[this] val (rows, cols) = (bounds.downMost + 1, bounds.rightMost - bounds.leftMost + 3)
+  private[this] val rows = bounds.downMost + 3
+  private[this] val extraColsPerSide = rows + 1
+  private[this] val cols = bounds.rightMost - bounds.leftMost + extraColsPerSide * 2 + 1
   private[this] val data = new Array[Array[Char]](rows)
+  private[this] var grainsDropped = 0
+  initializeGrid()
 
-  data.indices.foreach { r =>
-    data(r) = new Array[Char](cols)
-    (0 until cols).foreach { c => data(r)(c) = '.' }
+  override def toString: String = data.map(row => row.mkString).mkString("\n")
+
+  def maxGrainsTillOverflow(x: Int): Int = {
+    dropSandWhile(x)(_ < rows - 2)
+    grainsDropped - 1
   }
 
-  rocks.foreach { path =>
-    (0 until path.points.size - 1).foreach { idx =>
-      fillLine(path.points(idx), path.points(idx + 1))
-    }
+  def maxGrainsTillFull(x: Int): Int = {
+    dropSandWhile(x)(_ > 0)
+    grainsDropped - 2
   }
 
-  def maxGrainsDroppingFrom(x: Int): Int = {
-    var dropped = 0
-    while (!dropSand(x)) dropped+=1
-    dropped
+  private[this] def dropSandWhile(x: Int)(test: Int => Boolean): Unit = {
+    var restY = -1
+    do {
+      restY = dropSand(x)
+    } while (test(restY))
   }
 
   /**
    * @param x from which x the sand falls
-   * @return true if the sand overflew
+   * @return the last y where the grain came to rest
    */
-  private[this] def dropSand(x: Int): Boolean = {
+  private[this] def dropSand(x: Int): Int = {
     var y = 0
     var col = normalized(x)
     data(y)(col) = 'o'
+    grainsDropped += 1
 
-    def moveIfPossible: Int = {
-      if (y >= rows - 1) return -1 // game over!
-      if (data(y + 1)(col) == '.') {
+    def moveTo(dest: RockPoint): Boolean = {
+      if (data(dest.y)(dest.x) == '.') {
         data(y)(col) = '.'
-        data(y + 1)(col) = 'o'
-        y += 1
-        return 0 // air right down
+        data(dest.y)(dest.x) = 'o'
+        y = dest.y
+        col = dest.x
+        return true
       }
-      if (data(y + 1)(col - 1) == '.') {
-        data(y)(col) = '.'
-        data(y + 1)(col - 1) = 'o'
-        y += 1
-        col -= 1
-        return 0 // air down left
-      }
-      if (data(y + 1)(col + 1) == '.') {
-        data(y)(col) = '.'
-        data(y + 1)(col + 1) = 'o'
-        y += 1
-        col += 1
-        return 0 // air down left
-      }
-
-      1 // cannot move any further
+      false
     }
 
-    var last = 0
-    while (last == 0) last = moveIfPossible
-    last == -1
+    def moveIfPossible: Boolean =
+      moveTo(RockPoint(col, y + 1)) ||
+        moveTo(RockPoint(col - 1, y + 1)) ||
+        moveTo(RockPoint(col + 1, y + 1))
+
+    var moved = true
+    while (moved) moved = moveIfPossible
+    y
   }
 
   private[this] def fillLine(from: RockPoint, until: RockPoint): Unit = {
@@ -110,9 +108,7 @@ private class RockGrid(rocks: Seq[RockPath]) {
     }
   }
 
-  private[this] def normalized(x: Int): Int = x - bounds.leftMost + 1
-
-  override def toString: String = data.map(row => row.mkString).mkString("\n")
+  private[this] def normalized(x: Int): Int = x - bounds.leftMost + extraColsPerSide
 
   private[this] def findBounds: RockWallBounds = {
     val (lm, rm, dm) = rocks
@@ -125,5 +121,20 @@ private class RockGrid(rocks: Seq[RockPath]) {
       .reduce((q1, q2) => (min(q1._1, q2._1), max(q1._2, q2._2), max(q1._3, q2._3)))
 
     RockWallBounds(lm, rm, dm)
+  }
+
+  private[this] def initializeGrid(): Unit = {
+    data.indices.foreach { r =>
+      data(r) = new Array[Char](cols)
+      (0 until cols).foreach { c => data(r)(c) = '.' }
+    }
+
+    (0 until cols).foreach { x => data.last(x) = '#' }
+
+    rocks.foreach { path =>
+      (0 until path.points.size - 1).foreach { idx =>
+        fillLine(path.points(idx), path.points(idx + 1))
+      }
+    }
   }
 }
